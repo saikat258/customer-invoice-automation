@@ -1,9 +1,16 @@
 const TEMPLATE_DOC_ID = '1wgtEoL6feqtZtb_lwdraJIibupCJXiHoM3coXOESCvc';
 const SHEET_NAME = 'master_customer_details';
 
+// Set either the folder ID or the folder path you want PDFs saved into.
+// Prefer folder ID because it is stable and does not depend on a Drive path.
+const INVOICE_FOLDER_ID = '1YE5isKtLep9AlqJS2ZZijGv4gaM2Jbbh';
+const INVOICE_FOLDER_PATH = 'Invoices/Customer Invoices';
+
 const PRODUCT_MAP = {
-  'Panchmukhi HanumanJi': { itemCode: 'PHJ01', unitPrice: 650 },
-  'Little KanhaJi': { itemCode: 'LKC01', unitPrice: 500 }
+  'Panchmukhi HanumanJi': { itemCode: 'PHJ01', unitPrice: 1200 },
+  'Little KanhaJi': { itemCode: 'LKC01', unitPrice: 900 },
+  'Customized Solo Figurine': { itemCode: 'CSF01', unitPrice: 1200 },
+  'Customized Couple Figurine': { itemCode: 'CCF01', unitPrice: 1700 }
 };
 
 function normalize(text) {
@@ -47,10 +54,36 @@ function ensureColumn(sheet, headers, headerName) {
 
 function buildEmailBody(customerName, invoiceAttached, failureMessage) {
   if (invoiceAttached) {
-    return `Hello ${customerName},\n\nThank you for placing an order with us.\n\nPlease find your invoice attached.\n\nThank you.\n\n*** This is a system generated mail. Please contact us on @inkfinitystudio.3d on Instagram or mail us at saikat258@gmail.com`;
+    return `Hello ${customerName},\n\nThank you for placing an order with us.\n\nPlease find your invoice attached.\n\nThank you.\n\n*** This is a system generated mail. Please contact us on @inkfinitystudio.3d on Instagram or mail us at payel.majumder.asn@gmail.com`;
   } else {
-    return `Hello ${customerName},\n\n${failureMessage}\n\n*** This is a system generated mail. Please contact us on @inkfinitystudio.3d on Instagram or mail us at saikat258@gmail.com`;
+    return `Hello ${customerName},\n\n${failureMessage}\n\n*** This is a system generated mail. Please contact us on @inkfinitystudio.3d on Instagram or mail us at payel.majumder.asn@gmail.com`;
   }
+}
+
+function getInvoiceFolder() {
+  if (INVOICE_FOLDER_ID) {
+    return DriveApp.getFolderById(INVOICE_FOLDER_ID);
+  }
+
+  const pathParts = INVOICE_FOLDER_PATH.split('/').map(part => part.trim()).filter(Boolean);
+  let currentFolder = DriveApp.getRootFolder();
+
+  for (const part of pathParts) {
+    let folder = null;
+    const folders = currentFolder.getFoldersByName(part);
+    while (folders.hasNext()) {
+      folder = folders.next();
+      break;
+    }
+
+    if (!folder) {
+      folder = currentFolder.createFolder(part);
+    }
+
+    currentFolder = folder;
+  }
+
+  return currentFolder;
 }
 
 function createInvoicePdf(invoiceNumber, data) {
@@ -74,7 +107,8 @@ function createInvoicePdf(invoiceNumber, data) {
   doc.saveAndClose();
 
   const pdfBlob = DriveApp.getFileById(copyFile.getId()).getAs(MimeType.PDF);
-  const pdfFile = DriveApp.createFile(pdfBlob).setName(`Invoice ${invoiceNumber}.pdf`);
+  const invoiceFolder = getInvoiceFolder();
+  const pdfFile = invoiceFolder.createFile(pdfBlob).setName(`Invoice ${invoiceNumber}.pdf`);
   pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
 
   return pdfFile;
