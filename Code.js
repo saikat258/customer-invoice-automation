@@ -88,7 +88,8 @@ function getInvoiceFolder() {
 
 function createInvoicePdf(invoiceNumber, data) {
   const templateFile = DriveApp.getFileById(TEMPLATE_DOC_ID);
-  const copyFile = templateFile.makeCopy(`Invoice ${invoiceNumber}`);
+  const invoiceFolder = getInvoiceFolder();
+  const copyFile = templateFile.makeCopy(`Invoice ${invoiceNumber}`, invoiceFolder);
   const doc = DocumentApp.openById(copyFile.getId());
   const body = doc.getBody();
 
@@ -107,9 +108,10 @@ function createInvoicePdf(invoiceNumber, data) {
   doc.saveAndClose();
 
   const pdfBlob = DriveApp.getFileById(copyFile.getId()).getAs(MimeType.PDF);
-  const invoiceFolder = getInvoiceFolder();
   const pdfFile = invoiceFolder.createFile(pdfBlob).setName(`Invoice ${invoiceNumber}.pdf`);
   pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  copyFile.setTrashed(true);
 
   return pdfFile;
 }
@@ -118,6 +120,15 @@ function sendEmail(email, subject, body, pdfFile) {
   const options = { name: 'InkFinity Studios' };
   if (pdfFile) options.attachments = [pdfFile.getAs(MimeType.PDF)];
   GmailApp.sendEmail(email, subject, body, options);
+}
+
+function getBillingAddressValue(rowValues, headers) {
+  const address1 = String(getValue(rowValues, headers, ['Billing Address (with Pincode):', 'Address', 'Customer Address', 'Address Line 1', 'Address 1']) || '').trim();
+  const address2 = String(getValue(rowValues, headers, ['Address Line 2', 'Address 2', 'Apartment', 'Flat', 'Street Address']) || '').trim();
+
+  if (!address1 && !address2) return '';
+  if (address1 && address2) return `${address1}, ${address2}`;
+  return address1 || address2;
 }
 
 function buildInvoiceData(rowValues, headers) {
@@ -132,7 +143,7 @@ function buildInvoiceData(rowValues, headers) {
   return {
     customerName: String(getValue(rowValues, headers, ['Customer Name']) || 'Customer').trim(),
     email: String(getValue(rowValues, headers, ['Email'])).trim(),
-    billingAddress: String(getValue(rowValues, headers, ['Billing Address'])).trim(),
+    billingAddress: getBillingAddressValue(rowValues, headers),
     product,
     quantity,
     itemCode: productInfo.itemCode,
